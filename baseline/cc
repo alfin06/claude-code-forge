@@ -1,0 +1,58 @@
+# Claude Baseline Usage
+
+This file defines the non-interactive Claude command template used by
+`baseline/run_pipeline.py`.
+
+## Command template
+
+```bash
+claude -p --dangerously-skip-permissions "create a new a.txt"
+```
+
+`run_pipeline.py` will parse this command and replace the final quoted prompt
+with a generated full prompt (from `baseline/prompt.md` + issue/PR context).
+
+## How to run the baseline pipeline
+
+From any working directory:
+
+```bash
+python /home/cc/claude-code-forge/baseline/run_pipeline.py \
+  --repos-root /home/cc/claude-code-forge/baseline/repo \
+  --result-root /home/cc/claude-code-forge/baseline/output
+```
+
+Dry-run mode (fetch + file generation only, no Claude execution):
+
+```bash
+python /home/cc/claude-code-forge/baseline/run_pipeline.py \
+  --repos-root /home/cc/claude-code-forge/baseline/repo \
+  --result-root /home/cc/claude-code-forge/baseline/output \
+  --dry-run
+```
+
+## Prerequisites
+
+- `gh` installed and authenticated (`gh auth login`).
+- `claude` CLI installed and available in `PATH`.
+- Environment exports configured in:
+  `/home/cc/claude-code-forge/start_claude_code.sh`
+
+## Output layout (per instance)
+
+`baseline/output/<repo>/<issue_number>/` includes:
+
+- `metadata/` (issue, PR, patch, generated prompt)
+- `files/` (Docker/test and agent-generated changed files)
+- checker-ready files at root:
+  - `issue_<n>.json`
+  - `claude.dockerfile`
+  - `test*.py`
+- `bundle/` with the same checker-ready content
+
+## F2P check
+
+```bash
+python /home/cc/claude-code-forge/baseline/f2p_from_swegent_bundle.py \
+  /home/cc/claude-code-forge/baseline/output/MLE-agent/273
+```
