@@ -6,8 +6,18 @@ import shlex
 import shutil
 import subprocess
 from pathlib import Path
+import sys
 from typing import Dict, List, Set, Tuple
+import time
+import requests
+from datetime import datetime, timezone
 
+# Dynamically add the parent directory (/home/cc/codex) to Python's path
+current_dir = Path(__file__).resolve().parent
+parent_dir = current_dir.parent
+if str(parent_dir) not in sys.path:
+    sys.path.insert(0, str(parent_dir))
+from stats.entry import StatsTool
 
 def run_cmd(
     cmd: List[str],
@@ -281,12 +291,18 @@ def main() -> None:
     base_env.update(template_env)
 
     for idx, item in enumerate(items, start=1):
+        instance_start_time = datetime.now(timezone.utc)
+        start_time_sec = time.time()
         repo = item["repo"]
         issue_number = int(item["issue_number"])
         pr_number = int(item["pr_number"])
         print(f"[{idx}/{len(items)}] Processing {repo} issue#{issue_number} pr#{pr_number}")
 
         repo_dir, cloned_now = ensure_repo(repo, repos_root)
+        if not cloned_now:
+            print(f"  - Cleaning repository {repo.split('/')[-1]} for a pristine run...")
+            run_cmd(["git", "reset", "--hard"], cwd=repo_dir)
+            run_cmd(["git", "clean", "-fd"], cwd=repo_dir)
         baseline_dir = repo_dir / args.baseline_dir_name
         baseline_dir.mkdir(parents=True, exist_ok=True)
 
@@ -303,16 +319,28 @@ def main() -> None:
         agent_prompt_file = baseline_dir / f"claude_prompt_{issue_number}.md"
         agent_prompt_file.write_text(agent_prompt, encoding="utf-8")
 
+        print("  - Starting native Forge stats tracker...")
+        stats_tool = StatsTool(verbose=True)
+        stats_tool.record_session_start()
+        print("  - Waiting 10 seconds for Forge API metrics to sync...")
+        time.sleep(10)
+
         if not args.dry_run:
             cmd = agent_base_cmd + [agent_prompt]
             print(f"  - running Claude in {repo_dir} ...")
             run_cmd(cmd, cwd=repo_dir, env=base_env, capture_output=False)
+
+        print("  - Ending native Forge stats tracker...")
+        stats_tool.record_session_end()
+        print("  - Waiting 25 seconds for Forge API metrics to sync...")
+        time.sleep(25)
 
         repo_name = repo.split("/")[-1]
         export_dir = result_root / repo_name / str(issue_number)
         meta_dir = export_dir / "metadata"
         files_dir = export_dir / "files"
         meta_dir.mkdir(parents=True, exist_ok=True)
+
         shutil.copy2(baseline_dir / "issue.json", meta_dir / "issue.json")
         shutil.copy2(baseline_dir / "pr.json", meta_dir / "pr.json")
         shutil.copy2(baseline_dir / f"pr_{pr_number}.patch", meta_dir / f"pr_{pr_number}.patch")
@@ -323,6 +351,30 @@ def main() -> None:
         keep_paths = changed_paths | collect_special_files(repo_dir)
         copy_repo_files(repo_dir, keep_paths, files_dir)
 
+        instance_end_time = datetime.now(timezone.utc)
+        duration_seconds = round(time.time() - start_time_sec, 2)
+
+         # move stats.json to the instance's output directory
+        stats_source = parent_dir / "baseline"/ "envgym" / "stat.json"
+        stats_dest = export_dir / "stat.json"
+
+        forge_stats_data = {}
+        if stats_source.exists():
+            shutil.move(str(stats_source), str(stats_dest))
+            print(f"  -> Moved stat.json to {stats_dest}")
+
+            # Extract the data so it can be added to the summary.json below
+            try:
+                with open(stats_dest, "r", encoding="utf-8") as f:
+                    full_data = json.load(f)
+                    # Isolate just the cost of this specific instance run
+                    forge_stats_data = full_data.get("usage_delta", full_data)
+                    print(f"  -> Extracted Cost: ${forge_stats_data.get('cost', 0):.6f}")
+            except Exception as e:
+                print(f"  -> Warning: Could not read stat.json: {e}")
+        else:
+            print(f"  -> Warning: {stats_source} was not found. Looked in: {stats_source}")
+
         summary = {
             "repo": repo,
             "issue_number": issue_number,
@@ -331,6 +383,12 @@ def main() -> None:
             "changed_files_count": len(changed_paths),
             "kept_files_count": len(keep_paths),
             "repo_removed": cloned_now,
+            "instance_timing": {
+                "start_time": instance_start_time.isoformat(),
+                "end_time": instance_end_time.isoformat(),
+                "duration_seconds": duration_seconds
+            },
+            "forge_stats": forge_stats_data,
         }
         summary.update(create_checker_bundle(export_dir, issue, pr, patch_text))
         (export_dir / "summary.json").write_text(json.dumps(summary, ensure_ascii=False, indent=2), encoding="utf-8")
