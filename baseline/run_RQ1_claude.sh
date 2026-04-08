@@ -32,7 +32,7 @@ if [[ -z "${GITHUB_TOKEN:-}" ]]; then
 fi
 
 # Define absolute paths
-CLAUDE_ROOT="/home/cc/claude-code-forge/baseline"
+CLAUDE_ROOT="/home/cc/repo/claude-code-forge/baseline"
 CLAUDE_REPOS_ROOT="$CLAUDE_ROOT/repo"
 CLAUDE_PIPELINE_SCRIPT="$CLAUDE_ROOT/run_pipeline.py"
 STATS_SCRIPT="$REPO_ROOT/stats/entry.py"
@@ -114,12 +114,13 @@ echo "All output will be logged to: $LOG_FILE"
 # 5. PIPELINE EXECUTION
 # ==============================================================================
 {
-    # echo -e "\n=============================================="
-    # echo "Starting cost tracker..."
-    # if [[ -f "$STATS_SCRIPT" ]]; then
-    #     conda run -n claude-baseline python "$STATS_SCRIPT" start || echo "Warning: Failed to start stats tracker"
-    # fi
+    echo -e "\n=============================================="
+    echo "Starting cost tracker..."
+    if [[ -f "$STATS_SCRIPT" ]]; then
+        conda run -n claude-baseline python "$STATS_SCRIPT" start || echo "Warning: Failed to start stats tracker"
+    fi
 
+    start_time=$(date +%s)
     # --------------------------------------------------------------------------
     # CLAUDE BASELINE EXECUTION
     # --------------------------------------------------------------------------
@@ -144,17 +145,21 @@ echo "All output will be logged to: $LOG_FILE"
     # ==============================================================================
     # 7. END TRACKING & METRICS REPORT
     # ==============================================================================
-    # echo -e "\nWaiting 5 seconds for API metrics to sync..."
-    # sleep 5
-    # echo "Ending cost tracker..."
-    # if [[ -f "$STATS_SCRIPT" ]]; then
-    #     conda run -n claude-baseline python "$STATS_SCRIPT" end || echo "Warning: Failed to end stats tracker"
-    # fi
+    end_time=$(date +%s)
+    duration=$((end_time - start_time))
+
+    echo -e "\nWaiting 5 seconds for API metrics to sync..."
+    sleep 5
+    echo "Ending cost tracker..."
+    if [[ -f "$STATS_SCRIPT" ]]; then
+        conda run -n claude-baseline python "$STATS_SCRIPT" end || echo "Warning: Failed to end stats tracker"
+    fi
 
     echo -e "\n=============================================="
     echo "     CLAUDE PIPELINE FUNNEL REPORT            "
     echo "=============================================="
     echo "1. Input Targets           : $(count_json "$INPUT_MAP") items"
+    echo "2. Pipeline Duration       : $(date -u -d @${duration} +"%H:%M:%S")"
     echo "=============================================="
     echo "Master Log File   : $LOG_FILE"
     echo "Output Bundles    : $OUTPUT_BASE"

@@ -145,7 +145,12 @@ def main() -> None:
     if not patch_text.strip():
         _die("linked_prs[0] missing patch text; cannot apply fix on top of base_sha.")
 
-    dockerfile_src = _pick_dockerfile(bundle_dir)
+    try:
+        dockerfile_src = _pick_dockerfile(bundle_dir)
+    except FileNotFoundError:
+        print(f"Warning: No *.dockerfile found in {bundle_dir}. Skipping.")
+        sys.exit(0)
+        
     test_files = _pick_tests(bundle_dir)
     if not test_files:
         _die(f"No test*.py found under {bundle_dir}")

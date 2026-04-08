@@ -22,7 +22,7 @@ Place this script in the baseline directory and run from there.
 import os
 import json
 
-RUN_INSTANCES_DIR = "/home/cc/claude-code-forge/run_instances/swegent_f2p"
+RUN_INSTANCES_DIR = "/home/cc/repo/claude-code-forge/run_instances/swegent_f2p"
 
 def main():
     f2p_count = 0

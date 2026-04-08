@@ -16,7 +16,7 @@ if agent_dir not in sys.path:
 class StatsTool:
     def __init__(self, verbose: bool = False):
         self.verbose = verbose
-        self.stats_file = "claude/stat.json"
+        self.stats_file = "envgym/stat.json"
 
         # Load .env
         possible_env_paths = [

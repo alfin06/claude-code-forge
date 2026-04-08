@@ -319,21 +319,21 @@ def main() -> None:
         agent_prompt_file = baseline_dir / f"claude_prompt_{issue_number}.md"
         agent_prompt_file.write_text(agent_prompt, encoding="utf-8")
 
-        print("  - Starting native Forge stats tracker...")
-        stats_tool = StatsTool(verbose=True)
-        stats_tool.record_session_start()
-        print("  - Waiting 10 seconds for Forge API metrics to sync...")
-        time.sleep(10)
+        # print("  - Starting native Forge stats tracker...")
+        # stats_tool = StatsTool(verbose=True)
+        # stats_tool.record_session_start()
+        # print("  - Waiting 10 seconds for Forge API metrics to sync...")
+        # time.sleep(10)
 
         if not args.dry_run:
             cmd = agent_base_cmd + [agent_prompt]
             print(f"  - running Claude in {repo_dir} ...")
             run_cmd(cmd, cwd=repo_dir, env=base_env, capture_output=False)
 
-        print("  - Ending native Forge stats tracker...")
-        stats_tool.record_session_end()
-        print("  - Waiting 25 seconds for Forge API metrics to sync...")
-        time.sleep(25)
+        # print("  - Ending native Forge stats tracker...")
+        # stats_tool.record_session_end()
+        # print("  - Waiting 25 seconds for Forge API metrics to sync...")
+        # time.sleep(25)
 
         repo_name = repo.split("/")[-1]
         export_dir = result_root / repo_name / str(issue_number)
